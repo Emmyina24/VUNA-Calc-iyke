@@ -104,7 +104,7 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/inalegwu-calculator:latest
 
   # ============================================================
-  # Job 5 – Deploy via FTP to VPS
+  # Job 5 – Deploy via SSH to VPS
   # ============================================================
   deploy:
     name: Deploy to VPS
@@ -114,23 +114,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy site files to staging folder
-        run: |
-          mkdir -p ./deploy-staging
-          cp index.html ./deploy-staging/
-          cp -r assets ./deploy-staging/assets
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass
 
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          local-dir: ./deploy-staging/
-          server-dir: /home/inalegwu.vudse26.cloud/public_html/
-          dangerous-clean-slate: true
+      - name: Clear old files on server
+        run: |
+          sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no root@${{ secrets.SSH_HOST }} \
+            "rm -rf /home/inalegwu.vudse26.cloud/public_html/* && echo 'Cleared old files'"
+
+      - name: Copy files to server via SCP
+        run: |
+          sshpass -p "${{ secrets.SSH_PASSWORD }}" scp -o StrictHostKeyChecking=no \
+            -r index.html assets \
+            root@${{ secrets.SSH_HOST }}:/home/inalegwu.vudse26.cloud/public_html/
+
+      - name: Fix file permissions
+        run: |
+          sshpass -p "${{ secrets.SSH_PASSWORD }}" ssh -o StrictHostKeyChecking=no root@${{ secrets.SSH_HOST }} \
+            "chmod -R 755 /home/inalegwu.vudse26.cloud/public_html/ && echo 'Permissions fixed'"
 
   # ============================================================
   # Job 6 – Verify deployment
@@ -141,7 +142,7 @@ jobs:
     needs: deploy
     steps:
       - name: Wait for server to settle
-        run: sleep 15
+        run: sleep 10
 
       - name: Check live URL returns HTTP 200
         run: |
