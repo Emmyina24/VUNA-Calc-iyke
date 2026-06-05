@@ -130,6 +130,7 @@ jobs:
           port: 21
           local-dir: ./deploy-staging/
           server-dir: /home/inalegwu.vudse26.cloud/public_html/
+          dangerous-clean-slate: true
 
   # ============================================================
   # Job 6 – Verify deployment
