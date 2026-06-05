@@ -114,6 +114,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Copy site files to staging folder
+        run: |
+          mkdir -p ./deploy-staging
+          cp index.html ./deploy-staging/
+          cp -r assets ./deploy-staging/assets
+
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -122,17 +128,8 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
           port: 21
-          local-dir: ./
-          server-dir: /home/${{ secrets.FTP_USERNAME }}/public_html/
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/tests/**
-            Dockerfile
-            .dockerignore
-            eslint.config.js
-            package*.json
+          local-dir: ./deploy-staging/
+          server-dir: /home/inalegwu.vudse26.cloud/public_html/
 
   # ============================================================
   # Job 6 – Verify deployment
