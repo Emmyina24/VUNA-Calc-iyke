@@ -9,10 +9,6 @@
 var currentExpression = "";
 var LAST_RESULT = 0;
 
-// ── Constants ────────────────────────────────────────────────
-var OVERLINE = "\u0305"; // combining overline character
-var MAX_ROMAN = 1000000000000; // 1 trillion
-
 // ============================================================
 //  CORE MATH HELPERS  (exported for Jest)
 // ============================================================
@@ -40,12 +36,14 @@ function calculateExpression(expression) {
 }
 
 /**
- * Convert a number 0–999 to a Roman numeral string (no thousands).
- * Returns "" for 0.
+ * Convert a positive integer (1–3999) to a Roman numeral string.
+ * Returns null for out-of-range values.
  */
-function toRomanGroup(num) {
-  var val = [900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
-  var sym = ["CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"];
+function toRoman(num) {
+  if (!Number.isInteger(num) || num < 1 || num > 3999) return null;
+
+  var val = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
+  var sym = ["M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"];
   var result = "";
 
   for (var i = 0; i < val.length; i++) {
@@ -55,70 +53,6 @@ function toRomanGroup(num) {
     }
   }
   return result;
-}
-
-/**
- * Convert a positive integer (1 – 1,000,000,000,000) to a Roman numeral
- * string.
- *
- * Numbers up to 3999 use standard Roman numerals.
- *
- * Numbers above 3999 use the traditional "vinculum" (overline) extension:
- * a combining overline character placed over a numeral multiplies its
- * value by 1000.
- *   - 1 overline  = ×1,000
- *   - 2 overlines = ×1,000,000
- *   - 3 overlines = ×1,000,000,000
- *   - 4 overlines = ×1,000,000,000,000  (so 1 trillion = "I" + 4 overlines)
- *
- * Returns null for out-of-range / non-integer values.
- */
-function toRoman(num) {
-  if (!Number.isInteger(num) || num < 1 || num > MAX_ROMAN) return null;
-
-  // Standard range – identical to classic Roman numerals
-  if (num <= 3999) {
-    var val = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
-    var sym = ["M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"];
-    var result = "";
-
-    for (var i = 0; i < val.length; i++) {
-      while (num >= val[i]) {
-        result += sym[i];
-        num    -= val[i];
-      }
-    }
-    return result;
-  }
-
-  // Extended range – split into base-1000 "digit groups"
-  var groups = [];
-  var n = num;
-
-  while (n > 0) {
-    groups.push(n % 1000);
-    n = Math.floor(n / 1000);
-  }
-  groups.reverse(); // most significant group first
-
-  var parts = [];
-  for (var idx = 0; idx < groups.length; idx++) {
-    var level = groups.length - 1 - idx; // how many overlines this group needs
-    var g     = groups[idx];
-
-    if (g === 0) continue;
-
-    var roman = toRomanGroup(g);
-
-    if (level > 0) {
-      var lines = "";
-      for (var l = 0; l < level; l++) lines += OVERLINE;
-      roman = roman.split("").map(function (ch) { return ch + lines; }).join("");
-    }
-    parts.push(roman);
-  }
-
-  return parts.join(" ");
 }
 
 // ============================================================
@@ -132,26 +66,21 @@ function updateDisplay() {
 }
 
 function updateRomanDisplay() {
-  var romanDiv  = document.getElementById("roman-display");
-  var romanSpan = document.getElementById("roman-result");
+  var romanDiv    = document.getElementById("roman-display");
+  var romanSpan   = document.getElementById("roman-result");
   if (!romanDiv || !romanSpan) return;
 
-  // Only show roman numeral when there's a plain positive integer on screen
+  // Only show roman numeral when there's a plain integer on screen
   var trimmed = currentExpression.trim();
   var asInt   = parseInt(trimmed, 10);
 
   if (
-    /^\d+$/.test(trimmed) &&     // pure digits only
+    /^\d+$/.test(trimmed) &&          // pure digits only
     asInt >= 1 &&
-    asInt <= MAX_ROMAN            // up to 1 trillion
+    asInt <= 3999
   ) {
-    var roman = toRoman(asInt);
-    if (roman) {
-      romanSpan.textContent  = roman;
-      romanDiv.style.display = "flex";
-    } else {
-      romanDiv.style.display = "none";
-    }
+    romanSpan.textContent  = toRoman(asInt);
+    romanDiv.style.display = "flex";
   } else {
     romanDiv.style.display = "none";
   }
@@ -216,33 +145,6 @@ function calculateResult() {
 }
 
 // ============================================================
-//  ROMAN NUMERAL CONVERTER BUTTON
-// ============================================================
-
-/**
- * Evaluates whatever is currently on screen, then forces the result
- * to be shown both as a plain number and (if 1 – 1,000,000,000,000)
- * as a Roman numeral.
- */
-function convertToRoman() {
-  if (!currentExpression) return;
-
-  var result = calculateExpression(currentExpression);
-
-  if (result === "Error" || !Number.isInteger(result) || result < 1 || result > MAX_ROMAN) {
-    var romanDiv  = document.getElementById("roman-display");
-    var romanSpan = document.getElementById("roman-result");
-    if (romanSpan) romanSpan.textContent = "N/A";
-    if (romanDiv)  romanDiv.style.display = "flex";
-    return;
-  }
-
-  LAST_RESULT = result;
-  currentExpression = String(result);
-  updateDisplay(); // will also trigger updateRomanDisplay()
-}
-
-// ============================================================
 //  THEME TOGGLE
 // ============================================================
 
@@ -284,5 +186,5 @@ if (typeof window !== "undefined") {
 // ============================================================
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { calculateExpression, toRoman, toRomanGroup };
+  module.exports = { calculateExpression, toRoman };
 }
