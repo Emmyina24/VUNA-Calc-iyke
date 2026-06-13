@@ -118,17 +118,20 @@ describe("toRoman – basic conversions", () => {
   });
 });
 
-describe("toRoman – edge cases", () => {
-  test("returns null for 0", () => {
-    expect(toRoman(0)).toBeNull();
+describe("toRoman – edge cases (extended output)", () => {
+  const OVERLINE = "\u0305";
+
+  test("zero represented as 'N'", () => {
+    expect(toRoman(0)).toBe("N");
   });
 
-  test("returns null for negative numbers", () => {
-    expect(toRoman(-5)).toBeNull();
+  test("negative numbers are signed (e.g. -5 -> -V)", () => {
+    expect(toRoman(-5)).toBe("-V");
   });
 
-  test("returns null for numbers above 3999", () => {
-    expect(toRoman(4000)).toBeNull();
+  test("numbers >= 4000 use overline grouping", () => {
+    const expected = "I" + OVERLINE + "V" + OVERLINE; // 4000 -> overlined IV
+    expect(toRoman(4000)).toBe(expected);
   });
 
   test("returns null for decimals", () => {

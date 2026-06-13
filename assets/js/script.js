@@ -23,7 +23,6 @@ function calculateExpression(expression) {
     // Only allow safe characters: digits, operators, dot, space, parentheses
     if (!/^[0-9+\-*/.() %\s]+$/.test(expression)) return "Error";
 
-     
     var result = eval(expression);
 
     if (typeof result !== "number" || isNaN(result) || !isFinite(result)) {
@@ -35,24 +34,108 @@ function calculateExpression(expression) {
   }
 }
 
-/**
- * Convert a positive integer (1–3999) to a Roman numeral string.
- * Returns null for out-of-range values.
- */
-function toRoman(num) {
-  if (!Number.isInteger(num) || num < 1 || num > 3999) return null;
-
+// Helper: convert a number in the range 0–999 to plain Roman numerals.
+// Returns empty string for 0.
+function toRomanGroup(n) {
   var val = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
   var sym = ["M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"];
-  var result = "";
+  var num = Number(n);
+  if (!Number.isInteger(num) || num < 0) return null;
+  if (num === 0) return "";
 
+  var result = "";
   for (var i = 0; i < val.length; i++) {
     while (num >= val[i]) {
       result += sym[i];
-      num    -= val[i];
+      num -= val[i];
     }
   }
   return result;
+}
+
+/**
+ * Convert ANY integer (zero, negative, or arbitrarily large) into a
+ * Roman numeral string using group-overline (vinculum) notation for
+ * values >= 4000. Returns null only for non-integer input.
+ */
+function toRoman(num) {
+  if (!Number.isInteger(num)) return null;
+  if (num === 0) return "N"; // "nulla"
+
+  var negative = num < 0;
+  if (negative) num = -num;
+
+  if (num < 4000) {
+    return (negative ? "-" : "") + toRomanGroup(num);
+  }
+
+  var groups = [];
+  while (num > 0) {
+    groups.push(num % 1000);
+    num = Math.floor(num / 1000);
+  }
+
+  var result = "";
+  for (var g = groups.length - 1; g >= 0; g--) {
+    var digit = groups[g];
+    if (digit === 0) continue;
+    var romanPart = toRomanGroup(digit);
+    if (g > 0) {
+      var overline = "\u0305".repeat(g);
+      romanPart = romanPart.split("").map(function (ch) { return ch + overline; }).join("");
+    }
+    result += romanPart;
+  }
+
+  return (negative ? "-" : "") + result;
+}
+
+/**
+ * BigInt-aware variant that accepts a decimal-digit string (optionally
+ * prefixed with '-') and returns same overline-grouped result.
+ */
+function toRomanBig(numStr) {
+  if (!/^-?\d+$/.test(numStr)) return null;
+  var negative = numStr[0] === "-";
+  if (negative) numStr = numStr.slice(1);
+  var big = BigInt(numStr);
+  if (big === 0n) return "N";
+
+  var val = [1000n, 900n, 500n, 400n, 100n, 90n, 50n, 40n, 10n, 9n, 5n, 4n, 1n];
+  var sym = ["M","CM","D","CD","C","XC","L","XL","X","IX","V","IV","I"];
+
+  function basicRomanBig(n) {
+    var res = "";
+    for (var i = 0; i < val.length; i++) {
+      while (n >= val[i]) {
+        res += sym[i];
+        n -= val[i];
+      }
+    }
+    return res;
+  }
+
+  if (big < 4000n) return (negative ? "-" : "") + basicRomanBig(big);
+
+  var groups = [];
+  while (big > 0n) {
+    groups.push(Number(big % 1000n));
+    big = big / 1000n;
+  }
+
+  var result = "";
+  for (var g = groups.length - 1; g >= 0; g--) {
+    var digit = groups[g];
+    if (digit === 0) continue;
+    var romanPart = basicRomanBig(BigInt(digit));
+    if (g > 0) {
+      var overline = "\u0305".repeat(g);
+      romanPart = romanPart.split("").map(function (ch) { return ch + overline; }).join("");
+    }
+    result += romanPart;
+  }
+
+  return (negative ? "-" : "") + result;
 }
 
 // ============================================================
@@ -70,16 +153,20 @@ function updateRomanDisplay() {
   var romanSpan   = document.getElementById("roman-result");
   if (!romanDiv || !romanSpan) return;
 
-  // Only show roman numeral when there's a plain integer on screen
   var trimmed = currentExpression.trim();
-  var asInt   = parseInt(trimmed, 10);
+  var numbers = trimmed.match(/-?\d+\.?\d*/g);
+  var match   = numbers ? numbers[numbers.length - 1] : null;
 
-  if (
-    /^\d+$/.test(trimmed) &&          // pure digits only
-    asInt >= 1 &&
-    asInt <= 3999
-  ) {
-    romanSpan.textContent  = toRoman(asInt);
+  if (match) {
+    var numStr = match.split(".")[0];
+    var asInt  = parseInt(numStr, 10);
+    var roman;
+    if (!Number.isSafeInteger(asInt) && /^-?\d+$/.test(numStr)) {
+      roman = toRomanBig(numStr);
+    } else {
+      roman = toRoman(asInt);
+    }
+    romanSpan.textContent  = roman;
     romanDiv.style.display = "flex";
   } else {
     romanDiv.style.display = "none";
@@ -115,10 +202,8 @@ function percentToResult() {
 
   var match = currentExpression.match(/^([\d.]+)$/);
   if (match) {
-    // Standalone number: divide by 100
     currentExpression = String(parseFloat(match[1]) / 100);
   } else {
-    // e.g. "200+50" → treat last number as % of left side
     var parts = currentExpression.match(/^(.+?)([+\-*/])(\d+\.?\d*)$/);
     if (parts) {
       var left    = parseFloat(parts[1]);
@@ -186,5 +271,5 @@ if (typeof window !== "undefined") {
 // ============================================================
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { calculateExpression, toRoman };
+  module.exports = { calculateExpression, toRoman, toRomanBig, toRomanGroup };
 }
